@@ -1,0 +1,172 @@
+{
+  "name": "WF20_RUN_JOB_MANIFEST",
+  "nodes": [
+    {
+      "id": "Start",
+      "name": "Start",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "Read",
+      "name": "Read manifest",
+      "type": "n8n-nodes-base.readBinaryFile",
+      "typeVersion": 1,
+      "position": [
+        460,
+        300
+      ],
+      "parameters": {
+        "filePath": "={{$json.manifest_path || '/data/LSN_OUTPUTS/JOB_MANIFEST.json'}}"
+      }
+    },
+    {
+      "id": "Parse",
+      "name": "Parse JSON",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 2,
+      "position": [
+        680,
+        300
+      ],
+      "parameters": {
+        "functionCode": "const bin = items[0].binary.data;\nconst txt = Buffer.from(bin.data, bin.encoding || 'base64').toString('utf8');\nconst manifest = JSON.parse(txt);\nconst jobs = Array.isArray(manifest) ? manifest : (manifest.jobs || []);\nif (!Array.isArray(jobs)) throw new Error(\"Manifest must be array or have .jobs array\");\nreturn jobs.map(j => ({json:j}));\n"
+      }
+    },
+    {
+      "id": "Split",
+      "name": "Split In Batches (5)",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 1,
+      "position": [
+        900,
+        300
+      ],
+      "parameters": {
+        "batchSize": 5
+      }
+    },
+    {
+      "id": "Post",
+      "name": "POST to WF00 webhook",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1120,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{$json.webhook_url || 'http://localhost:5678/webhook/lsn/job'}}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{$json}}",
+        "options": {
+          "timeout": 300000
+        }
+      }
+    },
+    {
+      "id": "Wait",
+      "name": "Wait 1s",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [
+        1340,
+        300
+      ],
+      "parameters": {
+        "amount": 1,
+        "unit": "seconds"
+      }
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Read manifest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read manifest": {
+      "main": [
+        [
+          {
+            "node": "Parse JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse JSON": {
+      "main": [
+        [
+          {
+            "node": "Split In Batches (5)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split In Batches (5)": {
+      "main": [
+        [
+          {
+            "node": "POST to WF00 webhook",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Split In Batches (5)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST to WF00 webhook": {
+      "main": [
+        [
+          {
+            "node": "Wait 1s",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 1s": {
+      "main": [
+        [
+          {
+            "node": "Split In Batches (5)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "timezone": "Australia/Melbourne"
+  },
+  "meta": {
+    "purpose": "Read JOB_MANIFEST.json and POST each job to WF00 in batches.",
+    "generated_at": "2026-01-07"
+  }
+}

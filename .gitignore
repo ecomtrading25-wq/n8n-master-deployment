@@ -1,0 +1,40 @@
+# Environment files with secrets
+.env
+*.env.local
+
+# Docker data volumes
+01_DOCKER/data/
+
+# n8n data
+.n8n/
+
+# Logs
+*.log
+logs/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+ENV/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Temporary files
+*.tmp
+*.bak
+workflow_ids.json
+
+# Node modules (if any)
+node_modules/

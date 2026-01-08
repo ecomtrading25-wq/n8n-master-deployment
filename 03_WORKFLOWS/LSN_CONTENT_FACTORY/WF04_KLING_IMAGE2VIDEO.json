@@ -1,0 +1,298 @@
+{
+  "name": "WF04_KLING_IMAGE2VIDEO",
+  "nodes": [
+    {
+      "id": "Start",
+      "name": "Start",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "Prep",
+      "name": "Prep",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 2,
+      "position": [
+        460,
+        300
+      ],
+      "parameters": {
+        "functionCode": "const j=items[0].json; if(!j.inputs?.image_url) throw new Error('Missing inputs.image_url'); j._prompt=j.inputs.prompt||j.creative?.script?.text||'Hyperreal 9:16 clip.'; return [{json:j}];"
+      }
+    },
+    {
+      "id": "Create",
+      "name": "Create task",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        700,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.piapi.ai/api/v1/task",
+        "sendHeaders": true,
+        "headerParametersUi": {
+          "parameter": [
+            {
+              "name": "x-api-key",
+              "value": "={{$env.PIAPI_KLING_API_KEY}}"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"type\":\"kling_image_to_video\",\"input\":{\"image\":$json.inputs.image_url,\"prompt\":$json._prompt,\"aspect_ratio\":\"9:16\"}}",
+        "options": {
+          "timeout": 120000
+        }
+      }
+    },
+    {
+      "id": "GetID",
+      "name": "Get task_id",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 2,
+      "position": [
+        920,
+        300
+      ],
+      "parameters": {
+        "functionCode": "const r=items[0].json; const id=r?.data?.id||r?.id||r?.task_id; if(!id) throw new Error('No task id'); $json._task_id=id; return [{json:$json}];"
+      }
+    },
+    {
+      "id": "Wait",
+      "name": "Wait 10s",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [
+        1140,
+        300
+      ],
+      "parameters": {
+        "amount": 10,
+        "unit": "seconds"
+      }
+    },
+    {
+      "id": "Status",
+      "name": "Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1360,
+        300
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.piapi.ai/api/v1/task/{{$json._task_id}}",
+        "sendHeaders": true,
+        "headerParametersUi": {
+          "parameter": [
+            {
+              "name": "x-api-key",
+              "value": "={{$env.PIAPI_KLING_API_KEY}}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 120000
+        }
+      }
+    },
+    {
+      "id": "IfDone",
+      "name": "If done",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1580,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json.data?.status || $json.status}}",
+              "operation": "equals",
+              "value2": "succeeded"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "Loop",
+      "name": "Wait 10s loop",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [
+        1580,
+        440
+      ],
+      "parameters": {
+        "amount": 10,
+        "unit": "seconds"
+      }
+    },
+    {
+      "id": "Download",
+      "name": "Download",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1800,
+        300
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{$json.data?.output?.video_url || $json.output?.video_url || $json.data?.result?.url}}",
+        "responseFormat": "file",
+        "options": {
+          "timeout": 300000
+        }
+      }
+    },
+    {
+      "id": "Write",
+      "name": "Write MP4",
+      "type": "n8n-nodes-base.writeBinaryFile",
+      "typeVersion": 1,
+      "position": [
+        2020,
+        300
+      ],
+      "parameters": {
+        "fileName": "={{$json._output_dir}}/kling.mp4",
+        "dataPropertyName": "data"
+      }
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Prep",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep": {
+      "main": [
+        [
+          {
+            "node": "Create task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create task": {
+      "main": [
+        [
+          {
+            "node": "Get task_id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get task_id": {
+      "main": [
+        [
+          {
+            "node": "Wait 10s",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 10s": {
+      "main": [
+        [
+          {
+            "node": "Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Status": {
+      "main": [
+        [
+          {
+            "node": "If done",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If done": {
+      "main": [
+        [
+          {
+            "node": "Download",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait 10s loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 10s loop": {
+      "main": [
+        [
+          {
+            "node": "Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download": {
+      "main": [
+        [
+          {
+            "node": "Write MP4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "timezone": "Australia/Melbourne"
+  },
+  "meta": {
+    "purpose": "Kling I2V via PiAPI: create \u2192 poll \u2192 download.",
+    "generated_at": "2026-01-07"
+  }
+}

@@ -1,0 +1,298 @@
+{
+  "name": "WF03_HEYGEN_TALKING",
+  "nodes": [
+    {
+      "id": "Start",
+      "name": "Start",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "Prep",
+      "name": "Prep",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 2,
+      "position": [
+        460,
+        300
+      ],
+      "parameters": {
+        "functionCode": "const j=items[0].json; const audioUrl=j.inputs?.audio_url; if(!audioUrl) throw new Error('Missing inputs.audio_url'); j._audio_url=audioUrl; return [{json:j}];"
+      }
+    },
+    {
+      "id": "Create",
+      "name": "HeyGen Create",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        700,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.heygen.com/v2/video/generate",
+        "sendHeaders": true,
+        "headerParametersUi": {
+          "parameter": [
+            {
+              "name": "X-Api-Key",
+              "value": "={{$env.HEYGEN_API_KEY}}"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"video_inputs\":[{\"character\":{\"type\":\"avatar\",\"avatar_id\":$json.identity_id},\"voice\":{\"type\":\"audio\",\"audio_url\":$json._audio_url},\"background\":{\"type\":\"color\",\"value\":\"#000000\"}}]}",
+        "options": {
+          "timeout": 120000
+        }
+      }
+    },
+    {
+      "id": "GetID",
+      "name": "Get video_id",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 2,
+      "position": [
+        920,
+        300
+      ],
+      "parameters": {
+        "functionCode": "const r=items[0].json; const id=r?.data?.video_id||r?.video_id||r?.id; if(!id) throw new Error('No video_id'); $json._heygen_video_id=id; return [{json:$json}];"
+      }
+    },
+    {
+      "id": "Wait",
+      "name": "Wait 10s",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [
+        1140,
+        300
+      ],
+      "parameters": {
+        "amount": 10,
+        "unit": "seconds"
+      }
+    },
+    {
+      "id": "Status",
+      "name": "Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1360,
+        300
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.heygen.com/v1/video_status.get?video_id={{$json._heygen_video_id}}",
+        "sendHeaders": true,
+        "headerParametersUi": {
+          "parameter": [
+            {
+              "name": "X-Api-Key",
+              "value": "={{$env.HEYGEN_API_KEY}}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 120000
+        }
+      }
+    },
+    {
+      "id": "IfDone",
+      "name": "If done",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1580,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json.data?.status || $json.status}}",
+              "operation": "equals",
+              "value2": "completed"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "Loop",
+      "name": "Wait 10s loop",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [
+        1580,
+        440
+      ],
+      "parameters": {
+        "amount": 10,
+        "unit": "seconds"
+      }
+    },
+    {
+      "id": "Download",
+      "name": "Download MP4",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1800,
+        300
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{$json.data?.video_url || $json.video_url}}",
+        "responseFormat": "file",
+        "options": {
+          "timeout": 300000
+        }
+      }
+    },
+    {
+      "id": "Write",
+      "name": "Write MP4",
+      "type": "n8n-nodes-base.writeBinaryFile",
+      "typeVersion": 1,
+      "position": [
+        2020,
+        300
+      ],
+      "parameters": {
+        "fileName": "={{$json._output_dir}}/talking.mp4",
+        "dataPropertyName": "data"
+      }
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Prep",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep": {
+      "main": [
+        [
+          {
+            "node": "HeyGen Create",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HeyGen Create": {
+      "main": [
+        [
+          {
+            "node": "Get video_id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get video_id": {
+      "main": [
+        [
+          {
+            "node": "Wait 10s",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 10s": {
+      "main": [
+        [
+          {
+            "node": "Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Status": {
+      "main": [
+        [
+          {
+            "node": "If done",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If done": {
+      "main": [
+        [
+          {
+            "node": "Download MP4",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait 10s loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 10s loop": {
+      "main": [
+        [
+          {
+            "node": "Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download MP4": {
+      "main": [
+        [
+          {
+            "node": "Write MP4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "timezone": "Australia/Melbourne"
+  },
+  "meta": {
+    "purpose": "HeyGen create \u2192 poll \u2192 download MP4.",
+    "generated_at": "2026-01-07"
+  }
+}

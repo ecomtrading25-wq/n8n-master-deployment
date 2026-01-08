@@ -1,0 +1,131 @@
+{
+  "name": "AI-OS 08 - Incident Kill Switch",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "2d4zvsfazi6m1lld",
+      "name": "Start",
+      "type": "n8n-nodes-base.start",
+      "typeVersion": 1,
+      "position": [
+        -240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO incidents(business_id,severity,title,details,status) VALUES($1,'sev1','KILL SWITCH ACTIVATED',$2::jsonb,'open') RETURNING id;",
+        "additionalFields": {
+          "queryParams": "={{ [$json.business_id, JSON.stringify({ task: $json, at: new Date().toISOString() })] }}"
+        }
+      },
+      "id": "rf8f4rooblt7bmdn",
+      "name": "Open Incident",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "j7j40p497uzs12yc",
+      "name": "Disable Active Workflows (manual step)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        260,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "channel": "={{ $env.AIOS_SLACK_INCIDENT_CHANNEL || 'incidents' }}",
+        "text": "={{ `\ud83d\udea8 KILL SWITCH ACTIVATED for business ${$json.business_id}. Incident ${$items('Open Incident')[0].json.id}. Check Ops Console.` }}"
+      },
+      "id": "fu6trg7nwfpu18qe",
+      "name": "Slack Notify (optional)",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2,
+      "position": [
+        520,
+        0
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "mca34bbeseu0a0wb",
+      "name": "NoOp",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        760,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Open Incident",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Open Incident": {
+      "main": [
+        [
+          {
+            "node": "Disable Active Workflows (manual step)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Disable Active Workflows (manual step)": {
+      "main": [
+        [
+          {
+            "node": "Slack Notify (optional)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slack Notify (optional)": {
+      "main": [
+        [
+          {
+            "node": "NoOp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetup": true
+  },
+  "pinData": {},
+  "versionId": "w0ws1jq1j5us",
+  "tags": [
+    "ai-os",
+    "governance"
+  ]
+}

@@ -1,0 +1,84 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "LSN Job",
+  "type": "object",
+  "required": [
+    "job_id",
+    "product_id",
+    "output_type",
+    "identity_id",
+    "creative"
+  ],
+  "properties": {
+    "job_id": {
+      "type": "string"
+    },
+    "product_id": {
+      "type": "string"
+    },
+    "output_type": {
+      "type": "string",
+      "enum": [
+        "talking",
+        "cinematic",
+        "listing_gallery",
+        "voice"
+      ]
+    },
+    "identity_id": {
+      "type": "string"
+    },
+    "inputs": {
+      "type": "object"
+    },
+    "creative": {
+      "type": "object",
+      "required": [
+        "angle_id",
+        "hook_id",
+        "cta_id",
+        "script"
+      ],
+      "properties": {
+        "angle_id": {
+          "type": "string"
+        },
+        "hook_id": {
+          "type": "string"
+        },
+        "cta_id": {
+          "type": "string"
+        },
+        "script": {
+          "type": "object",
+          "required": [
+            "text"
+          ],
+          "properties": {
+            "text": {
+              "type": "string"
+            },
+            "duration_sec": {
+              "type": "number"
+            },
+            "on_screen_captions": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "disclosures": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "routing": {
+      "type": "object"
+    }
+  }
+}

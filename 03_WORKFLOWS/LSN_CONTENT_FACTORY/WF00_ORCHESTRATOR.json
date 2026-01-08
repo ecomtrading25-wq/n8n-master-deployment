@@ -1,0 +1,193 @@
+{
+  "name": "WF00_ORCHESTRATOR",
+  "nodes": [
+    {
+      "id": "Webhook",
+      "name": "LSN Job Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lsn/job",
+        "responseMode": "onReceived",
+        "options": {}
+      }
+    },
+    {
+      "id": "Validate",
+      "name": "Validate Job",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 2,
+      "position": [
+        460,
+        300
+      ],
+      "parameters": {
+        "functionCode": "const j = items[0].json;\nconst req = ['job_id','product_id','output_type','identity_id','creative'];\nfor (const k of req) { if (!j[k]) throw new Error('Missing ' + k); }\nif (!['talking','cinematic','listing_gallery','voice'].includes(j.output_type)) throw new Error('Invalid output_type');\nj._output_dir = `${$env.LSN_OUTPUT_DIR}/${j.product_id}/${j.job_id}`;\nreturn [{json:j}];"
+      }
+    },
+    {
+      "id": "Route",
+      "name": "Route by output_type",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 2,
+      "position": [
+        680,
+        300
+      ],
+      "parameters": {
+        "propertyName": "={{$json.output_type}}",
+        "rules": [
+          {
+            "operation": "equal",
+            "value1": "talking"
+          },
+          {
+            "operation": "equal",
+            "value1": "voice"
+          },
+          {
+            "operation": "equal",
+            "value1": "cinematic"
+          },
+          {
+            "operation": "equal",
+            "value1": "listing_gallery"
+          }
+        ]
+      }
+    },
+    {
+      "id": "Exec_Talking",
+      "name": "Execute WF03 HeyGen Talking",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [
+        920,
+        160
+      ],
+      "parameters": {
+        "workflowId": "={{$env.WF_TALKING_ID || ''}}",
+        "options": {
+          "waitForCompletion": true
+        }
+      }
+    },
+    {
+      "id": "Exec_Voice",
+      "name": "Execute WF02 ElevenLabs Voice",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [
+        920,
+        260
+      ],
+      "parameters": {
+        "workflowId": "={{$env.WF_VOICE_ID || ''}}",
+        "options": {
+          "waitForCompletion": true
+        }
+      }
+    },
+    {
+      "id": "Exec_Cinematic",
+      "name": "Execute WF04/WF05 Cinematic",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [
+        920,
+        360
+      ],
+      "parameters": {
+        "workflowId": "={{$env.WF_CINEMATIC_ID || ''}}",
+        "options": {
+          "waitForCompletion": true
+        }
+      }
+    },
+    {
+      "id": "Exec_Listing",
+      "name": "Execute WF01 ComfyUI Listing",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [
+        920,
+        460
+      ],
+      "parameters": {
+        "workflowId": "={{$env.WF_LISTING_ID || ''}}",
+        "options": {
+          "waitForCompletion": true
+        }
+      }
+    }
+  ],
+  "connections": {
+    "LSN Job Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Job": {
+      "main": [
+        [
+          {
+            "node": "Route by output_type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by output_type": {
+      "main": [
+        [
+          {
+            "node": "Execute WF03 HeyGen Talking",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Execute WF02 ElevenLabs Voice",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Execute WF04/WF05 Cinematic",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Execute WF01 ComfyUI Listing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "timezone": "Australia/Melbourne"
+  },
+  "meta": {
+    "purpose": "Webhook entrypoint: validate + route to sub-workflows.",
+    "generated_at": "2026-01-07"
+  }
+}

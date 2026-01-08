@@ -1,0 +1,137 @@
+{
+  "name": "AI-OS 09 - Metrics Snapshot (Hourly)",
+  "nodes": [
+    {
+      "parameters": {
+        "triggerTimes": [
+          {
+            "mode": "everyHour"
+          }
+        ]
+      },
+      "id": "ltju1we4ot4y1tey",
+      "name": "Cron",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [
+        -240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id,name FROM businesses ORDER BY name;"
+      },
+      "id": "dajeee18ygxfe69n",
+      "name": "List Businesses",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Replace this with real metrics queries / connector pulls.\n// Keep it cheap and frequent (hourly). Store as JSON.\nconst biz = $json;\nconst metrics = {\n  revenue_24h_cents: 0,\n  orders_24h: 0,\n  refunds_24h: 0,\n  cash_runway_days: null,\n  at: new Date().toISOString()\n};\nreturn [{ json: { business_id: biz.id, metrics } }];\n"
+      },
+      "id": "ppxlk0jizcyzeydf",
+      "name": "Compute Snapshot (placeholder)",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        260,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO state_snapshots(business_id, metrics) VALUES($1,$2::jsonb);",
+        "additionalFields": {
+          "queryParams": "={{ [$json.business_id, JSON.stringify($json.metrics)] }}"
+        }
+      },
+      "id": "s24tlpmgktovwe4v",
+      "name": "Insert Snapshot",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        520,
+        0
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "em5ul16s057kaz7d",
+      "name": "NoOp",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        760,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Cron": {
+      "main": [
+        [
+          {
+            "node": "List Businesses",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List Businesses": {
+      "main": [
+        [
+          {
+            "node": "Compute Snapshot (placeholder)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compute Snapshot (placeholder)": {
+      "main": [
+        [
+          {
+            "node": "Insert Snapshot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Snapshot": {
+      "main": [
+        [
+          {
+            "node": "NoOp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetup": true
+  },
+  "pinData": {},
+  "versionId": "rubxictp5fqe",
+  "tags": [
+    "ai-os",
+    "observability"
+  ]
+}

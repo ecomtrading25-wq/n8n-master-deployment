@@ -1,0 +1,48 @@
+[
+  {
+    "job_id": "JOB_P_0003_voice_001",
+    "product_id": "P_0003",
+    "output_type": "voice",
+    "identity_id": "AV_001",
+    "inputs": {},
+    "creative": {
+      "angle_id": "VOICE",
+      "hook_id": "H001",
+      "cta_id": "CTA1",
+      "script": {
+        "text": "Here\u2019s the quick test\u2014watch the fuzz disappear in seconds.",
+        "duration_sec": 10,
+        "on_screen_captions": [
+          "Real test.",
+          "Watch the result."
+        ],
+        "disclosures": []
+      }
+    },
+    "routing": {}
+  },
+  {
+    "job_id": "JOB_P_0004_talking_001",
+    "product_id": "P_0004",
+    "output_type": "talking",
+    "identity_id": "AV_002",
+    "inputs": {
+      "audio_url": "https://YOUR_PUBLIC_URL/voice.mp3"
+    },
+    "creative": {
+      "angle_id": "HOOK",
+      "hook_id": "H007",
+      "cta_id": "CTA1",
+      "script": {
+        "text": "If you\u2019ve ever lost your phone down the seat gap\u2026 watch this.",
+        "duration_sec": 12,
+        "on_screen_captions": [
+          "Stop losing your phone.",
+          "Installs in 10 seconds."
+        ],
+        "disclosures": []
+      }
+    },
+    "routing": {}
+  }
+]

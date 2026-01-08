@@ -1,0 +1,241 @@
+{
+  "name": "WF12_KLING_I2V_END2END",
+  "nodes": [
+    {
+      "id": "Start",
+      "name": "Start",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "HasImg",
+      "name": "Has inputs.image_url?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        460,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{!!$json.inputs && !!$json.inputs.image_url}}",
+              "operation": "isTrue"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "GenImg",
+      "name": "Run WF10 Render+Upload",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [
+        700,
+        440
+      ],
+      "parameters": {
+        "workflowId": "={{$env.WF_RENDER_UPLOAD_ID || ''}}",
+        "options": {
+          "waitForCompletion": true
+        }
+      }
+    },
+    {
+      "id": "Pass",
+      "name": "Pass-through",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 2,
+      "position": [
+        700,
+        160
+      ],
+      "parameters": {
+        "functionCode": "return items;"
+      }
+    },
+    {
+      "id": "SetImg",
+      "name": "Set inputs.image_url",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 2,
+      "position": [
+        920,
+        300
+      ],
+      "parameters": {
+        "functionCode": "const j=items[0].json; j.inputs=j.inputs||{}; if(!j.inputs.image_url) j.inputs.image_url=j.image_url; if(!j.inputs.image_url) throw new Error('Missing image_url'); return [{json:j}];"
+      }
+    },
+    {
+      "id": "Kling",
+      "name": "Run WF04 Kling I2V",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [
+        1140,
+        300
+      ],
+      "parameters": {
+        "workflowId": "={{$env.WF_KLING_ID || ''}}",
+        "options": {
+          "waitForCompletion": true
+        }
+      }
+    },
+    {
+      "id": "Prep",
+      "name": "Prep upload mp4",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 2,
+      "position": [
+        1360,
+        300
+      ],
+      "parameters": {
+        "functionCode": "const j=items[0].json; return [{json:{...j, local_path:`${j._output_dir}/kling.mp4`, object_key:`${j.product_id}/${j.job_id}/kling.mp4`}}];"
+      }
+    },
+    {
+      "id": "Upload",
+      "name": "Run WF08 Upload",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [
+        1580,
+        300
+      ],
+      "parameters": {
+        "workflowId": "={{$env.WF_UPLOAD_ID || ''}}",
+        "options": {
+          "waitForCompletion": true
+        }
+      }
+    },
+    {
+      "id": "Return",
+      "name": "Set video_url",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 2,
+      "position": [
+        1800,
+        300
+      ],
+      "parameters": {
+        "functionCode": "const j=items[0].json; j.video_url=j.public_url; return [{json:j}];"
+      }
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Has inputs.image_url?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has inputs.image_url?": {
+      "main": [
+        [
+          {
+            "node": "Pass-through",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Run WF10 Render+Upload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pass-through": {
+      "main": [
+        [
+          {
+            "node": "Set inputs.image_url",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run WF10 Render+Upload": {
+      "main": [
+        [
+          {
+            "node": "Set inputs.image_url",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set inputs.image_url": {
+      "main": [
+        [
+          {
+            "node": "Run WF04 Kling I2V",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run WF04 Kling I2V": {
+      "main": [
+        [
+          {
+            "node": "Prep upload mp4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep upload mp4": {
+      "main": [
+        [
+          {
+            "node": "Run WF08 Upload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run WF08 Upload": {
+      "main": [
+        [
+          {
+            "node": "Set video_url",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "timezone": "Australia/Melbourne"
+  },
+  "meta": {
+    "purpose": "Ensure image_url \u2192 Kling \u2192 upload \u2192 video_url.",
+    "generated_at": "2026-01-07"
+  }
+}

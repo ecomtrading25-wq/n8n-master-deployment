@@ -1,0 +1,251 @@
+{
+  "name": "AI-OS 07 - Finance Gate (Reconcile -> Hold/Approve)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "w061bzvfj8yzp02b",
+      "name": "Start",
+      "type": "n8n-nodes-base.start",
+      "typeVersion": 1,
+      "position": [
+        -240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "const input = $json.input || $json;\nconst p = input.payload || {};\nconst payee_id = p.payee_id || 'unknown';\nconst amount_cents = Number(p.amount_cents || 0);\nconst external_ref = p.external_ref || null;\nreturn [{ json: { ...$json, payee_id, amount_cents, external_ref } }];\n"
+      },
+      "id": "7m0ku8f85gpc8lmk",
+      "name": "Extract Payout",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT matched FROM reconciliations WHERE business_id=$1 AND external_ref=$2 LIMIT 1;",
+        "additionalFields": {
+          "queryParams": "={{ [$json.business_id, $json.external_ref] }}"
+        }
+      },
+      "id": "ktu9kuk5n0iur434",
+      "name": "Check Reconciliation",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        260,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "const rows = $items('Check Reconciliation').map(i=>i.json);\nconst matched = rows.length ? (rows[0].matched === true) : false;\nconst needsHold = !$json.external_ref || !matched;\nreturn [{ json: { ...$json, __recon_matched: matched, __needsHold: needsHold } }];\n"
+      },
+      "id": "wvxgfirq6n4i5etk",
+      "name": "Decide Hold",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        520,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.__needsHold === true }}",
+              "operation": "isTrue"
+            }
+          ]
+        }
+      },
+      "id": "r7zrxlnslddza6yk",
+      "name": "If Hold",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        780,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO payouts(business_id,payee_id,amount_cents,status,meta) VALUES($1,$2,$3,'held',$4::jsonb);",
+        "additionalFields": {
+          "queryParams": "={{ [$json.business_id, $json.payee_id, $json.amount_cents, JSON.stringify({ external_ref: $json.external_ref, reason: 'Reconciliation missing or unmatched' })] }}"
+        }
+      },
+      "id": "kykja1d1ecrknjr0",
+      "name": "Create/Update Payout Held",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": "={{ $env.AIOS_WF_APPROVAL_REQUEST_ID }}",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "wvkhds9yber6btk1",
+      "name": "Request Approval (payout)",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [
+        1040,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO ledger_entries(business_id,memo,debit_account,credit_account,amount_cents,meta) VALUES($1,$2,'cash','payouts_payable',$3,$4::jsonb);",
+        "additionalFields": {
+          "queryParams": "={{ [$json.business_id, 'Payout requested', $json.amount_cents, JSON.stringify({ payee_id: $json.payee_id, external_ref: $json.external_ref })] }}"
+        }
+      },
+      "id": "a52u335kuuh4fi6x",
+      "name": "Write Ledger Entry (reserved)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        -140
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "bsbg41bjmq0x1wek",
+      "name": "NoOp",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1280,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Extract Payout",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Payout": {
+      "main": [
+        [
+          {
+            "node": "Check Reconciliation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Reconciliation": {
+      "main": [
+        [
+          {
+            "node": "Decide Hold",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Decide Hold": {
+      "main": [
+        [
+          {
+            "node": "If Hold",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Hold": {
+      "main": [
+        [
+          {
+            "node": "Write Ledger Entry (reserved)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create/Update Payout Held",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Ledger Entry (reserved)": {
+      "main": [
+        [
+          {
+            "node": "NoOp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create/Update Payout Held": {
+      "main": [
+        [
+          {
+            "node": "Request Approval (payout)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Request Approval (payout)": {
+      "main": [
+        [
+          {
+            "node": "NoOp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetup": true
+  },
+  "pinData": {},
+  "versionId": "5qjj5du48iew",
+  "tags": [
+    "ai-os",
+    "finance"
+  ]
+}

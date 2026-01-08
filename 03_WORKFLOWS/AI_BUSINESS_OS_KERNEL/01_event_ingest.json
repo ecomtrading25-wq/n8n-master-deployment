@@ -1,0 +1,196 @@
+{
+  "name": "AI-OS 01 - Event Ingest (Webhook -> Tasks)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ai-os/event-ingest",
+        "responseMode": "onReceived",
+        "options": {
+          "responseData": "allEntries"
+        }
+      },
+      "id": "k2h0zh1ma0r12zv2",
+      "name": "Webhook In",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Expected body: { business_name, event_type, payload, source? }\nconst body = $json.body || $json;\nconst business_name = body.business_name || body.business || 'DEFAULT';\nconst event_type = body.event_type || 'generic.event';\nconst source = body.source || 'webhook';\nconst payload = body.payload ?? body;\nreturn [{ json: { business_name, event_type, source, payload, received_at: new Date().toISOString() } }];\n"
+      },
+      "id": "bw0ynf95gdr9b1dd",
+      "name": "Normalize Event",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO businesses(name) VALUES($1)\nON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name\nRETURNING id;\n",
+        "additionalFields": {
+          "queryParams": "={{ [$json.business_name] }}"
+        }
+      },
+      "id": "1zigluxd2hey7htm",
+      "name": "Upsert Business",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        240,
+        -120
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO events(business_id, event_type, source, payload)\nVALUES($1,$2,$3,$4::jsonb)\nRETURNING id;\n",
+        "additionalFields": {
+          "queryParams": "={{ [$json[\"__business_id\"], $json.event_type, $json.source, JSON.stringify($json.payload)] }}"
+        }
+      },
+      "id": "1qoqxhqlw164btxt",
+      "name": "Insert Event",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        480,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Merge the returned business id into the event json\nconst biz = $items('Upsert Business')[0].json;\nconst business_id = biz.id || biz.ID || Object.values(biz)[0];\nconst out = { ...$json, __business_id: business_id };\nreturn [{ json: out }];\n"
+      },
+      "id": "25vrdt3xa6ocuo1o",
+      "name": "Attach Business ID",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        360,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO tasks(business_id, workflow_key, status, priority, input)\nVALUES($1,$2,'queued',$3,$4::jsonb)\nRETURNING id;\n",
+        "additionalFields": {
+          "queryParams": "={{ [$json.__business_id, $json.event_type, 50, JSON.stringify($json)] }}"
+        }
+      },
+      "id": "ydp4u34yx3geex0c",
+      "name": "Create Task",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        720,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "responseBody": "={{ { ok: true, task_id: $json.id || $json[\"id\"], message: \"Event accepted\" } }}",
+        "responseCode": 200
+      },
+      "id": "29cdrtb4uafso2kc",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        960,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook In": {
+      "main": [
+        [
+          {
+            "node": "Normalize Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Event": {
+      "main": [
+        [
+          {
+            "node": "Upsert Business",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert Business": {
+      "main": [
+        [
+          {
+            "node": "Attach Business ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Attach Business ID": {
+      "main": [
+        [
+          {
+            "node": "Insert Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Event": {
+      "main": [
+        [
+          {
+            "node": "Create Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Task": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetup": true
+  },
+  "pinData": {},
+  "versionId": "ltgxyl19mdk8",
+  "tags": [
+    "ai-os",
+    "kernel"
+  ]
+}

@@ -1,0 +1,325 @@
+{
+  "name": "AI-OS 02 - Task Dispatcher (Cron -> Policy -> Route)",
+  "nodes": [
+    {
+      "parameters": {
+        "triggerTimes": [
+          {
+            "mode": "everyMinute"
+          }
+        ]
+      },
+      "id": "sy11f3drcw75emit",
+      "name": "Cron",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [
+        -240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH next_task AS (\n  SELECT id FROM tasks\n  WHERE status='queued'\n  ORDER BY priority DESC, created_at ASC\n  LIMIT 1\n  FOR UPDATE SKIP LOCKED\n)\nUPDATE tasks\nSET status='running', updated_at=now()\nWHERE id IN (SELECT id FROM next_task)\nRETURNING *;\n"
+      },
+      "id": "6rp7hyrlsqqj24zz",
+      "name": "Fetch Next Task",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.id !== undefined }}",
+              "operation": "isTrue"
+            }
+          ]
+        }
+      },
+      "id": "cfvhnv28xnigorjl",
+      "name": "If No Task",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": "={{ $env.AIOS_WF_POLICY_GATE_ID }}",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "rmvk3hith251z6q4",
+      "name": "Policy Gate",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [
+        520,
+        -140
+      ]
+    },
+    {
+      "parameters": {
+        "value1": "={{ $json.workflow_key }}",
+        "rules": [
+          {
+            "operation": "equal",
+            "value2": "content.request"
+          },
+          {
+            "operation": "equal",
+            "value2": "finance.payout.request"
+          },
+          {
+            "operation": "equal",
+            "value2": "incident.kill_switch"
+          }
+        ],
+        "fallbackOutput": 3
+      },
+      "id": "3n5j1hs1ufhm15lq",
+      "name": "Route by workflow_key",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 2,
+      "position": [
+        760,
+        -140
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": "={{ $env.AIOS_WF_CONTENT_FACTORY_ID }}",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "860gov0ppm1jli8y",
+      "name": "Execute Content Factory",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [
+        1020,
+        -240
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": "={{ $env.AIOS_WF_FINANCE_GATE_ID }}",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "pc35sk7g20vrjzvy",
+      "name": "Execute Finance Gate",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [
+        1020,
+        -140
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": "={{ $env.AIOS_WF_KILL_SWITCH_ID }}",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "buu5fh0efwswbcjx",
+      "name": "Execute Kill Switch",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [
+        1020,
+        -40
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE tasks SET status='done', output=$2::jsonb, updated_at=now() WHERE id=$1;",
+        "additionalFields": {
+          "queryParams": "={{ [$json.id, JSON.stringify($json)] }}"
+        }
+      },
+      "id": "q4pck0b0ihtjtsnr",
+      "name": "Mark Done",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        1260,
+        -140
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE tasks SET status='failed', error=$2, updated_at=now() WHERE id=$1;",
+        "additionalFields": {
+          "queryParams": "={{ [$json.id, $json.error || 'Unknown error'] }}"
+        }
+      },
+      "id": "ct3mnzx833833e1b",
+      "name": "Mark Failed",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        1260,
+        60
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "r2ghsgbagaisuohe",
+      "name": "Noop",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        520,
+        140
+      ]
+    }
+  ],
+  "connections": {
+    "Cron": {
+      "main": [
+        [
+          {
+            "node": "Fetch Next Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Next Task": {
+      "main": [
+        [
+          {
+            "node": "If No Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If No Task": {
+      "main": [
+        [
+          {
+            "node": "Policy Gate",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Noop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Policy Gate": {
+      "main": [
+        [
+          {
+            "node": "Route by workflow_key",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by workflow_key": {
+      "main": [
+        [
+          {
+            "node": "Execute Content Factory",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Execute Finance Gate",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Execute Kill Switch",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark Done",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Content Factory": {
+      "main": [
+        [
+          {
+            "node": "Mark Done",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Finance Gate": {
+      "main": [
+        [
+          {
+            "node": "Mark Done",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Kill Switch": {
+      "main": [
+        [
+          {
+            "node": "Mark Done",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetup": true
+  },
+  "pinData": {},
+  "versionId": "p6ctioz8bkcl",
+  "tags": [
+    "ai-os",
+    "kernel"
+  ]
+}

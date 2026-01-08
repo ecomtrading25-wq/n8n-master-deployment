@@ -1,0 +1,160 @@
+{
+  "name": "AI-OS 03 - Policy Gate (Sub-workflow)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "yy93ptrg1b8n93c9",
+      "name": "Start",
+      "type": "n8n-nodes-base.start",
+      "typeVersion": 1,
+      "position": [
+        -240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT policy_key, policy_json FROM policies WHERE business_id=$1 AND is_enabled=true;",
+        "additionalFields": {
+          "queryParams": "={{ [$json.business_id] }}"
+        }
+      },
+      "id": "3u3mcir5wn7n3hh4",
+      "name": "Load Policies",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        -20,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Minimal policy evaluator.\n// Policy format example (policy_json):\n// { \"min_margin_bps\": 2500, \"max_payout_cents_without_approval\": 50000 }\n// You can extend this into a real DSL later.\nconst task = $json;\nconst policies = $items('Load Policies').map(i => i.json.policy_json || {});\nconst merged = policies.reduce((acc,p)=>Object.assign(acc,p), {});\n\nconst wk = task.workflow_key || '';\nconst input = task.input || {};\n\n// default\nlet allowed = true;\nlet reason = null;\nlet needsApproval = false;\nlet approvalType = 'other';\n\nif (wk === 'finance.payout.request') {\n  const amt = input.payload?.amount_cents ?? input.amount_cents ?? 0;\n  const cap = merged.max_payout_cents_without_approval ?? 25000;\n  approvalType = 'payout';\n  if (amt > cap) { allowed = false; needsApproval = true; reason = `Payout ${amt} > cap ${cap}`; }\n}\n\nif (wk === 'content.request') {\n  // generally allow; add brand safety/fraud checks here later\n  allowed = true;\n}\n\nreturn [{ json: { ...task, __policy: merged, __allowed: allowed, __needsApproval: needsApproval, __reason: reason, __approvalType: approvalType } }];\n"
+      },
+      "id": "8qsenc1ynfuccb8c",
+      "name": "Evaluate Policy",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.__allowed === true }}",
+              "operation": "isTrue"
+            }
+          ]
+        }
+      },
+      "id": "9d264nyw135i7scf",
+      "name": "If Allowed",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        500,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": "={{ $env.AIOS_WF_APPROVAL_REQUEST_ID }}",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "ll35w5kgzkya0hpi",
+      "name": "Request Approval",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [
+        760,
+        140
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "31av2b4zz2m28jkl",
+      "name": "NoOp Allowed",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        760,
+        -140
+      ]
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Load Policies",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Policies": {
+      "main": [
+        [
+          {
+            "node": "Evaluate Policy",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evaluate Policy": {
+      "main": [
+        [
+          {
+            "node": "If Allowed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Allowed": {
+      "main": [
+        [
+          {
+            "node": "NoOp Allowed",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Request Approval",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetup": true
+  },
+  "pinData": {},
+  "versionId": "uyfgl4jpba3u",
+  "tags": [
+    "ai-os",
+    "governance"
+  ]
+}

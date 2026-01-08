@@ -1,0 +1,30 @@
+{
+  "manifest_version": "1.0",
+  "created_at": "2026-01-07",
+  "jobs": [
+    {
+      "job_id": "JOB_P_0003_TALKING_H001_AV_001_001",
+      "product_id": "P_0003",
+      "output_type": "talking",
+      "identity_id": "AV_001",
+      "inputs": {},
+      "creative": {
+        "angle_id": "HOOK",
+        "hook_id": "H001",
+        "cta_id": "CTA1",
+        "script": {
+          "text": "I tested the viral fabric shaver so you don\u2019t have to\u2014watch the fuzz disappear.",
+          "duration_sec": 12,
+          "on_screen_captions": [
+            "Real test.",
+            "Watch the result."
+          ],
+          "disclosures": [
+            "Test on a small area first."
+          ]
+        }
+      },
+      "routing": {}
+    }
+  ]
+}

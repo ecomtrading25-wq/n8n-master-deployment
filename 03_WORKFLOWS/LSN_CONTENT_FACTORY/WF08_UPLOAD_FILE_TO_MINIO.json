@@ -1,0 +1,127 @@
+{
+  "name": "WF08_UPLOAD_FILE_TO_MINIO",
+  "nodes": [
+    {
+      "id": "Start",
+      "name": "Start",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "Prep",
+      "name": "Prep Upload Inputs",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 2,
+      "position": [
+        460,
+        300
+      ],
+      "parameters": {
+        "functionCode": "const j = items[0].json;\nif (!j.local_path) throw new Error(\"Missing local_path\");\nif (!j.object_key) throw new Error(\"Missing object_key\");\nj.public_url = `${$env.PUBLIC_ASSET_BASE_URL}/${j.object_key}`.replace(/\\/+/g,'/');\nreturn [{json:j}];\n"
+      }
+    },
+    {
+      "id": "Read",
+      "name": "Read binary file",
+      "type": "n8n-nodes-base.readBinaryFile",
+      "typeVersion": 1,
+      "position": [
+        700,
+        300
+      ],
+      "parameters": {
+        "filePath": "={{$json.local_path}}"
+      }
+    },
+    {
+      "id": "Upload",
+      "name": "S3 Upload (MinIO)",
+      "type": "n8n-nodes-base.awsS3",
+      "typeVersion": 1,
+      "position": [
+        920,
+        300
+      ],
+      "parameters": {
+        "operation": "upload",
+        "bucketName": "={{$env.MINIO_BUCKET}}",
+        "binaryData": true,
+        "binaryPropertyName": "data",
+        "fileName": "={{$json.object_key}}",
+        "options": {}
+      }
+    },
+    {
+      "id": "Return",
+      "name": "Return URL",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 2,
+      "position": [
+        1140,
+        300
+      ],
+      "parameters": {
+        "functionCode": "return [{json:{...$json, uploaded:true}}];"
+      }
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Prep Upload Inputs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep Upload Inputs": {
+      "main": [
+        [
+          {
+            "node": "Read binary file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read binary file": {
+      "main": [
+        [
+          {
+            "node": "S3 Upload (MinIO)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "S3 Upload (MinIO)": {
+      "main": [
+        [
+          {
+            "node": "Return URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "timezone": "Australia/Melbourne"
+  },
+  "meta": {
+    "purpose": "Upload local file to MinIO and output stable public_url.",
+    "generated_at": "2026-01-07"
+  }
+}

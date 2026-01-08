@@ -1,0 +1,128 @@
+{
+  "name": "WF10_COMFYUI_RENDER_AND_UPLOAD",
+  "nodes": [
+    {
+      "id": "Start",
+      "name": "Start",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "Render",
+      "name": "Run WF01 ComfyUI Listing",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [
+        460,
+        300
+      ],
+      "parameters": {
+        "workflowId": "={{$env.WF_LISTING_ID || ''}}",
+        "options": {
+          "waitForCompletion": true
+        }
+      }
+    },
+    {
+      "id": "Prep",
+      "name": "Prep upload",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 2,
+      "position": [
+        700,
+        300
+      ],
+      "parameters": {
+        "functionCode": "const j=items[0].json; return [{json:{...j, local_path:`${j._output_dir}/listing_01.png`, object_key:`${j.product_id}/${j.job_id}/listing_01.png`}}];"
+      }
+    },
+    {
+      "id": "Upload",
+      "name": "Run WF08 Upload",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [
+        920,
+        300
+      ],
+      "parameters": {
+        "workflowId": "={{$env.WF_UPLOAD_ID || ''}}",
+        "options": {
+          "waitForCompletion": true
+        }
+      }
+    },
+    {
+      "id": "Return",
+      "name": "Set image_url",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 2,
+      "position": [
+        1140,
+        300
+      ],
+      "parameters": {
+        "functionCode": "const j=items[0].json; j.image_url=j.public_url; return [{json:j}];"
+      }
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Run WF01 ComfyUI Listing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run WF01 ComfyUI Listing": {
+      "main": [
+        [
+          {
+            "node": "Prep upload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep upload": {
+      "main": [
+        [
+          {
+            "node": "Run WF08 Upload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run WF08 Upload": {
+      "main": [
+        [
+          {
+            "node": "Set image_url",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "timezone": "Australia/Melbourne"
+  },
+  "meta": {
+    "purpose": "ComfyUI render \u2192 upload \u2192 image_url.",
+    "generated_at": "2026-01-07"
+  }
+}

@@ -1,0 +1,98 @@
+{
+  "name": "WF06_PACKAGER_OPTIONAL",
+  "nodes": [
+    {
+      "id": "Start",
+      "name": "Start",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "Prep",
+      "name": "Prep captions",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 2,
+      "position": [
+        460,
+        300
+      ],
+      "parameters": {
+        "functionCode": "const j=items[0].json; j._dur=j.creative?.script?.duration_sec||12; j._srt=`${j._output_dir}/captions.srt`; const lines=j.creative?.script?.on_screen_captions||[]; j._lines=lines; return [{json:j}];"
+      }
+    },
+    {
+      "id": "SRT",
+      "name": "Write SRT",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        700,
+        300
+      ],
+      "parameters": {
+        "command": "python /data/LSN_CODE/caption_srt.py {{$json._dur}} {{$json._srt}} {{$json._lines.join(' ')}}"
+      }
+    },
+    {
+      "id": "Burn",
+      "name": "Burn captions",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        920,
+        300
+      ],
+      "parameters": {
+        "command": "python /data/LSN_CODE/packager.py burn {{$json._output_dir}}/talking.mp4 {{$json._srt}} {{$json._output_dir}}/talking_captioned.mp4"
+      }
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Prep captions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep captions": {
+      "main": [
+        [
+          {
+            "node": "Write SRT",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write SRT": {
+      "main": [
+        [
+          {
+            "node": "Burn captions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "timezone": "Australia/Melbourne"
+  },
+  "meta": {
+    "purpose": "Optional: captions SRT + ffmpeg burn (requires ffmpeg).",
+    "generated_at": "2026-01-07"
+  }
+}

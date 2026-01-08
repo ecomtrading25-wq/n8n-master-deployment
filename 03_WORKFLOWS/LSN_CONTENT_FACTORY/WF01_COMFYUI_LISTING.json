@@ -1,0 +1,300 @@
+{
+  "name": "WF01_COMFYUI_LISTING",
+  "nodes": [
+    {
+      "id": "Start",
+      "name": "Start",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "Prep",
+      "name": "Prep ComfyUI Prompt",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 2,
+      "position": [
+        460,
+        300
+      ],
+      "parameters": {
+        "functionCode": "const j = items[0].json;\n// Replace with your exported ComfyUI prompt graph JSON.\n// Placeholder minimal structure:\nj._comfy_prompt = {prompt: {}, client_id: 'n8n'};\nreturn [{json:j}];"
+      }
+    },
+    {
+      "id": "Submit",
+      "name": "ComfyUI Submit",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        700,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.COMFYUI_BASE_URL}}/prompt",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{$json._comfy_prompt}}",
+        "options": {
+          "timeout": 120000
+        }
+      }
+    },
+    {
+      "id": "SetID",
+      "name": "Set prompt_id",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 2,
+      "position": [
+        920,
+        300
+      ],
+      "parameters": {
+        "functionCode": "const res = items[0].json;\nconst j = $json;\nj._prompt_id = res.prompt_id || res.data?.prompt_id;\nif (!j._prompt_id) throw new Error('No prompt_id returned from ComfyUI');\nreturn [{json:j}];"
+      }
+    },
+    {
+      "id": "Wait",
+      "name": "Wait 3s",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [
+        1140,
+        300
+      ],
+      "parameters": {
+        "amount": 3,
+        "unit": "seconds"
+      }
+    },
+    {
+      "id": "Poll",
+      "name": "Poll history",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1360,
+        300
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{$env.COMFYUI_BASE_URL}}/history/{{$json._prompt_id}}",
+        "options": {
+          "timeout": 120000
+        }
+      }
+    },
+    {
+      "id": "IfDone",
+      "name": "If done",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1580,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{Object.keys($json || {}).length > 0}}",
+              "operation": "isTrue"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "LoopWait",
+      "name": "Wait 3s loop",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [
+        1580,
+        440
+      ],
+      "parameters": {
+        "amount": 3,
+        "unit": "seconds"
+      }
+    },
+    {
+      "id": "Download",
+      "name": "Download first image",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1800,
+        300
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{$env.COMFYUI_BASE_URL}}/view?filename={{$json[Object.keys($json)[0]].outputs[0].images[0].filename}}&subfolder={{$json[Object.keys($json)[0]].outputs[0].images[0].subfolder}}&type=output",
+        "responseFormat": "file",
+        "options": {
+          "timeout": 120000
+        }
+      }
+    },
+    {
+      "id": "Write",
+      "name": "Write PNG",
+      "type": "n8n-nodes-base.writeBinaryFile",
+      "typeVersion": 1,
+      "position": [
+        2020,
+        300
+      ],
+      "parameters": {
+        "fileName": "={{$json._output_dir}}/listing_01.png",
+        "dataPropertyName": "data"
+      }
+    },
+    {
+      "id": "Meta",
+      "name": "Write meta.json",
+      "type": "n8n-nodes-base.writeFile",
+      "typeVersion": 1,
+      "position": [
+        2240,
+        300
+      ],
+      "parameters": {
+        "fileName": "={{$json._output_dir}}/meta.json",
+        "text": "={{JSON.stringify($json, null, 2)}}"
+      }
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Prep ComfyUI Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep ComfyUI Prompt": {
+      "main": [
+        [
+          {
+            "node": "ComfyUI Submit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ComfyUI Submit": {
+      "main": [
+        [
+          {
+            "node": "Set prompt_id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set prompt_id": {
+      "main": [
+        [
+          {
+            "node": "Wait 3s",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 3s": {
+      "main": [
+        [
+          {
+            "node": "Poll history",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Poll history": {
+      "main": [
+        [
+          {
+            "node": "If done",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If done": {
+      "main": [
+        [
+          {
+            "node": "Download first image",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait 3s loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 3s loop": {
+      "main": [
+        [
+          {
+            "node": "Poll history",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download first image": {
+      "main": [
+        [
+          {
+            "node": "Write PNG",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write PNG": {
+      "main": [
+        [
+          {
+            "node": "Write meta.json",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "timezone": "Australia/Melbourne"
+  },
+  "meta": {
+    "purpose": "ComfyUI: submit /prompt, poll /history, download /view, write outputs.",
+    "generated_at": "2026-01-07"
+  }
+}

@@ -1,0 +1,134 @@
+{
+  "name": "AI-OS 06 - Content Factory (Brief -> Queue Publish)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "wxtwp4i1nb1806ol",
+      "name": "Start",
+      "type": "n8n-nodes-base.start",
+      "typeVersion": 1,
+      "position": [
+        -240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "const input = $json.input || $json;\nconst payload = input.payload || {};\nconst topic = payload.topic || 'Default product demo';\nconst platform = payload.platform || 'tiktok';\nconst brief = {\n  topic,\n  platform,\n  hook: payload.hook || 'Stop scrolling\u2026',\n  beats: payload.beats || ['problem', 'demo', 'proof', 'offer', 'cta'],\n  duration_sec: payload.duration_sec || 25,\n  created_at: new Date().toISOString()\n};\nreturn [{ json: { ...$json, brief } }];\n"
+      },
+      "id": "k5kt2yjq3olz2tlw",
+      "name": "Build Brief",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO actions(task_id, action_type, tool, request, status) VALUES($1,'content_brief','n8n',$2::jsonb,'ok');",
+        "additionalFields": {
+          "queryParams": "={{ [$json.id, JSON.stringify({ brief: $json.brief })] }}"
+        }
+      },
+      "id": "srh72un5fithvpll",
+      "name": "Write Action Log",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        260,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO tasks(business_id, workflow_key, status, priority, input) VALUES($1,'content.publish','queued',40,$2::jsonb) RETURNING id;",
+        "additionalFields": {
+          "queryParams": "={{ [$json.business_id, JSON.stringify({ parent_task_id: $json.id, brief: $json.brief })] }}"
+        }
+      },
+      "id": "pmglq7qxo2zlup4p",
+      "name": "Queue Publish Task",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        520,
+        0
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "mvg6nacua4v629xg",
+      "name": "NoOp",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        760,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Build Brief",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Brief": {
+      "main": [
+        [
+          {
+            "node": "Write Action Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Action Log": {
+      "main": [
+        [
+          {
+            "node": "Queue Publish Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Queue Publish Task": {
+      "main": [
+        [
+          {
+            "node": "NoOp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetup": true
+  },
+  "pinData": {},
+  "versionId": "3mnenyhni1u7",
+  "tags": [
+    "ai-os",
+    "growth"
+  ]
+}

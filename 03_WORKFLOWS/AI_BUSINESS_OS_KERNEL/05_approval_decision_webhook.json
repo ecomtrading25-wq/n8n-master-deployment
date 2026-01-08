@@ -1,0 +1,211 @@
+{
+  "name": "AI-OS 05 - Approval Decision (Webhook)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "ai-os/approve",
+        "responseMode": "onReceived",
+        "options": {
+          "responseData": "allEntries"
+        }
+      },
+      "id": "dhn6znp1het3u65w",
+      "name": "Webhook Approve",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "const q = $json.query || $json;\nconst approval_id = q.approval_id || q.id;\nconst decision = (q.decision || '').toLowerCase();\nconst decided_by = q.by || 'founder';\nif (!approval_id) throw new Error('approval_id required');\nif (!['approved','rejected'].includes(decision)) throw new Error('decision must be approved|rejected');\nreturn [{ json: { approval_id, decision, decided_by } }];\n"
+      },
+      "id": "952z0x876g6oei3z",
+      "name": "Parse Decision",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE approvals SET status=$2, decided_by=$3, decided_at=now() WHERE id=$1 RETURNING task_id, business_id;",
+        "additionalFields": {
+          "queryParams": "={{ [$json.approval_id, $json.decision, $json.decided_by] }}"
+        }
+      },
+      "id": "vwmzw1tiblf1q6kz",
+      "name": "Update Approval",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.status || $json.decision }}",
+              "operation": "contains",
+              "value2": "approved"
+            }
+          ]
+        }
+      },
+      "id": "51w4fpysftgakwa8",
+      "name": "If Approved",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        480,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE tasks SET status='queued', updated_at=now() WHERE id=$1;",
+        "additionalFields": {
+          "queryParams": "={{ [$json.task_id] }}"
+        }
+      },
+      "id": "w5pr93s8td8mut5u",
+      "name": "Unblock Task",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        720,
+        -120
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE tasks SET status='failed', error='Rejected by founder', updated_at=now() WHERE id=$1;",
+        "additionalFields": {
+          "queryParams": "={{ [$json.task_id] }}"
+        }
+      },
+      "id": "gi6p22fpojvzkqm0",
+      "name": "Fail Task",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        720,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "responseBody": "={{ { ok: true, approval_id: $json.approval_id, decision: $json.decision } }}",
+        "responseCode": 200
+      },
+      "id": "ufrsdsgikoo4x1rn",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        960,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook Approve": {
+      "main": [
+        [
+          {
+            "node": "Parse Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Decision": {
+      "main": [
+        [
+          {
+            "node": "Update Approval",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Approval": {
+      "main": [
+        [
+          {
+            "node": "If Approved",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Approved": {
+      "main": [
+        [
+          {
+            "node": "Unblock Task",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fail Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Unblock Task": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fail Task": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetup": true
+  },
+  "pinData": {},
+  "versionId": "rzds0fcn6jpf",
+  "tags": [
+    "ai-os",
+    "governance"
+  ]
+}

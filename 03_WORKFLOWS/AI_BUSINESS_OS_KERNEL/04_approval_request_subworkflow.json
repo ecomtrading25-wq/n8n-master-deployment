@@ -1,0 +1,137 @@
+{
+  "name": "AI-OS 04 - Approval Request (Create + Notify)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "xldwr043nzuj8c6b",
+      "name": "Start",
+      "type": "n8n-nodes-base.start",
+      "typeVersion": 1,
+      "position": [
+        -240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO approvals(business_id, task_id, approval_type, request, status)\nVALUES($1,$2,$3,$4::jsonb,'pending')\nRETURNING id;\n",
+        "additionalFields": {
+          "queryParams": "={{ [$json.business_id, $json.id, $json.__approvalType || 'other', JSON.stringify({ reason: $json.__reason, task: $json })] }}"
+        }
+      },
+      "id": "kla1feztyy2vhjvp",
+      "name": "Create Approval",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE tasks SET status='blocked', updated_at=now() WHERE id=$1;",
+        "additionalFields": {
+          "queryParams": "={{ [$json.id] }}"
+        }
+      },
+      "id": "5d25sebjzppqvqc0",
+      "name": "Block Task",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "channel": "={{ $env.AIOS_SLACK_APPROVAL_CHANNEL || 'approvals' }}",
+        "text": "={{ `APPROVAL REQUIRED: ${$json.__approvalType} | Task ${$json.id}\\nReason: ${$json.__reason}\\nApprove: ${$env.AIOS_BASE_URL}/webhook/ai-os/approve?approval_id=${$items('Create Approval')[0].json.id}&decision=approved\\nReject: ${$env.AIOS_BASE_URL}/webhook/ai-os/approve?approval_id=${$items('Create Approval')[0].json.id}&decision=rejected` }}"
+      },
+      "id": "e81r9tmw9bj97i0h",
+      "name": "Slack Notify (optional)",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2,
+      "position": [
+        480,
+        0
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "cpsgoro604yxz9e3",
+      "name": "NoOp",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        720,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Create Approval",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Approval": {
+      "main": [
+        [
+          {
+            "node": "Block Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Block Task": {
+      "main": [
+        [
+          {
+            "node": "Slack Notify (optional)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slack Notify (optional)": {
+      "main": [
+        [
+          {
+            "node": "NoOp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetup": true
+  },
+  "pinData": {},
+  "versionId": "hfdv5d5hd7h2",
+  "tags": [
+    "ai-os",
+    "governance"
+  ]
+}

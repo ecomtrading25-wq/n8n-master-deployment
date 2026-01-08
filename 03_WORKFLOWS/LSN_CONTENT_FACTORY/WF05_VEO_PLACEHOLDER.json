@@ -1,0 +1,102 @@
+{
+  "name": "WF05_VEO_PLACEHOLDER",
+  "nodes": [
+    {
+      "id": "Start",
+      "name": "Start",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "Prep",
+      "name": "Prep",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 2,
+      "position": [
+        460,
+        300
+      ],
+      "parameters": {
+        "functionCode": "const j=items[0].json; j._prompt=j.inputs?.prompt||j.creative?.script?.text||'Hyperreal b-roll 8s 9:16 with natural audio.'; return [{json:j}];"
+      }
+    },
+    {
+      "id": "Call",
+      "name": "Call Veo (placeholder)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        700,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://ai.google.dev/gemini-api/docs/video",
+        "options": {
+          "timeout": 120000
+        }
+      }
+    },
+    {
+      "id": "Note",
+      "name": "NOTE",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 2,
+      "position": [
+        920,
+        300
+      ],
+      "parameters": {
+        "functionCode": "// Replace this workflow with your verified Veo request/response (Gemini API or Vertex AI).\nreturn items;"
+      }
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Prep",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep": {
+      "main": [
+        [
+          {
+            "node": "Call Veo (placeholder)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Veo (placeholder)": {
+      "main": [
+        [
+          {
+            "node": "NOTE",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "timezone": "Australia/Melbourne"
+  },
+  "meta": {
+    "purpose": "Replace with Veo implementation via Gemini API or Vertex AI.",
+    "generated_at": "2026-01-07"
+  }
+}

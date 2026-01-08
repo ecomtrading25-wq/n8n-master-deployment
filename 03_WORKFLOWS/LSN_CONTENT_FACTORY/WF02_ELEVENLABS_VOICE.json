@@ -1,0 +1,124 @@
+{
+  "name": "WF02_ELEVENLABS_VOICE",
+  "nodes": [
+    {
+      "id": "Start",
+      "name": "Start",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "Prep",
+      "name": "Prep request",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 2,
+      "position": [
+        460,
+        300
+      ],
+      "parameters": {
+        "functionCode": "const j=items[0].json; if(!j.creative?.script?.text) throw new Error('Missing creative.script.text'); j._voice_id=$env.ELEVENLABS_VOICE_ID||'REPLACE_ME'; return [{json:j}];"
+      }
+    },
+    {
+      "id": "TTS",
+      "name": "ElevenLabs TTS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        700,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.elevenlabs.io/v1/text-to-speech/{{$json._voice_id}}",
+        "sendHeaders": true,
+        "headerParametersUi": {
+          "parameter": [
+            {
+              "name": "xi-api-key",
+              "value": "={{$env.ELEVENLABS_API_KEY}}"
+            },
+            {
+              "name": "accept",
+              "value": "audio/mpeg"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"text\": $json.creative.script.text, \"model_id\":\"eleven_multilingual_v2\"}",
+        "responseFormat": "file",
+        "options": {
+          "timeout": 120000
+        }
+      }
+    },
+    {
+      "id": "Write",
+      "name": "Write MP3",
+      "type": "n8n-nodes-base.writeBinaryFile",
+      "typeVersion": 1,
+      "position": [
+        920,
+        300
+      ],
+      "parameters": {
+        "fileName": "={{$json._output_dir}}/voice.mp3",
+        "dataPropertyName": "data"
+      }
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Prep request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep request": {
+      "main": [
+        [
+          {
+            "node": "ElevenLabs TTS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ElevenLabs TTS": {
+      "main": [
+        [
+          {
+            "node": "Write MP3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "timezone": "Australia/Melbourne"
+  },
+  "meta": {
+    "purpose": "ElevenLabs TTS \u2192 write MP3.",
+    "generated_at": "2026-01-07"
+  }
+}

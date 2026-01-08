@@ -1,0 +1,241 @@
+{
+  "name": "WF11_HEYGEN_TALKING_END2END",
+  "nodes": [
+    {
+      "id": "Start",
+      "name": "Start",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "HasAudio",
+      "name": "Has inputs.audio_url?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        460,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{!!$json.inputs && !!$json.inputs.audio_url}}",
+              "operation": "isTrue"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "GenAudio",
+      "name": "Run WF09 Voice+Upload",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [
+        700,
+        440
+      ],
+      "parameters": {
+        "workflowId": "={{$env.WF_VOICE_UPLOAD_ID || ''}}",
+        "options": {
+          "waitForCompletion": true
+        }
+      }
+    },
+    {
+      "id": "Pass",
+      "name": "Pass-through",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 2,
+      "position": [
+        700,
+        160
+      ],
+      "parameters": {
+        "functionCode": "return items;"
+      }
+    },
+    {
+      "id": "SetAudio",
+      "name": "Set inputs.audio_url",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 2,
+      "position": [
+        920,
+        300
+      ],
+      "parameters": {
+        "functionCode": "const j=items[0].json; j.inputs=j.inputs||{}; if(!j.inputs.audio_url) j.inputs.audio_url=j.audio_url; if(!j.inputs.audio_url) throw new Error('Missing audio_url'); return [{json:j}];"
+      }
+    },
+    {
+      "id": "HeyGen",
+      "name": "Run WF03 HeyGen Talking",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [
+        1140,
+        300
+      ],
+      "parameters": {
+        "workflowId": "={{$env.WF_TALKING_ID || ''}}",
+        "options": {
+          "waitForCompletion": true
+        }
+      }
+    },
+    {
+      "id": "Prep",
+      "name": "Prep upload mp4",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 2,
+      "position": [
+        1360,
+        300
+      ],
+      "parameters": {
+        "functionCode": "const j=items[0].json; return [{json:{...j, local_path:`${j._output_dir}/talking.mp4`, object_key:`${j.product_id}/${j.job_id}/talking.mp4`}}];"
+      }
+    },
+    {
+      "id": "Upload",
+      "name": "Run WF08 Upload",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [
+        1580,
+        300
+      ],
+      "parameters": {
+        "workflowId": "={{$env.WF_UPLOAD_ID || ''}}",
+        "options": {
+          "waitForCompletion": true
+        }
+      }
+    },
+    {
+      "id": "Return",
+      "name": "Set video_url",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 2,
+      "position": [
+        1800,
+        300
+      ],
+      "parameters": {
+        "functionCode": "const j=items[0].json; j.video_url=j.public_url; return [{json:j}];"
+      }
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Has inputs.audio_url?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has inputs.audio_url?": {
+      "main": [
+        [
+          {
+            "node": "Pass-through",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Run WF09 Voice+Upload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pass-through": {
+      "main": [
+        [
+          {
+            "node": "Set inputs.audio_url",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run WF09 Voice+Upload": {
+      "main": [
+        [
+          {
+            "node": "Set inputs.audio_url",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set inputs.audio_url": {
+      "main": [
+        [
+          {
+            "node": "Run WF03 HeyGen Talking",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run WF03 HeyGen Talking": {
+      "main": [
+        [
+          {
+            "node": "Prep upload mp4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep upload mp4": {
+      "main": [
+        [
+          {
+            "node": "Run WF08 Upload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run WF08 Upload": {
+      "main": [
+        [
+          {
+            "node": "Set video_url",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "timezone": "Australia/Melbourne"
+  },
+  "meta": {
+    "purpose": "Ensure audio_url \u2192 HeyGen \u2192 upload \u2192 video_url.",
+    "generated_at": "2026-01-07"
+  }
+}
